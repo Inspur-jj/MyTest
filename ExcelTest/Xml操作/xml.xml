@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data><pub_thesis><basic_info><thesis_type_value>1</thesis_type_value><thesis_type_name>期刊论文</thesis_type_name><zh_title>院系新增论文测试</zh_title><en_title/><cabstract/><eabstract/><zh_keyword/><en_keyword/><periodical_id_value/><periodical_id_name/><doc_type_value/><doc_type_name/><cited_list_value/><cited_list_name/><is_first_complete_value/><is_first_complete_name/><patent_dept_value>-1</patent_dept_value><patent_dept_name>三峡大学科研管理系统</patent_dept_name><issue/><volume/><start_page_no/><end_page_no/><article_no/><doi>132321</doi><retrieval_number/><cited_times/><publish_date>2017-03-03</publish_date><fdflag/><fulltext_url/><remark/></basic_info><persons><person seq_no="1"><psn_name_in_thesis>132123</psn_name_in_thesis><psn_code_value>111</psn_code_value><psn_code_name>admin</psn_code_name><is_tong_xun>0</is_tong_xun><email>iris-version@irissz.com</email><sequence_no_value>1</sequence_no_value><sequence_no_name>第一作者</sequence_no_name><other_org>爱瑞思大学</other_org></person></persons><file><file_name/><file_code/><file_remark/></file>
+<archive_file>
+	<file seq_no="1">
+		<filename>ALSKDJALSKDJLK</filename>
+	</file>
+	<file seq_no="2">
+		<filename>哈哈</filename>
+	</file>
+</archive_file>
+</pub_thesis></data>
