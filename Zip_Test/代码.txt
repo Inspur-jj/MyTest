@@ -1,0 +1,156 @@
+/**
+	 * 解析zip文件 由于系统需要做记录 所以必须把zip包里的文件都单独弄错File类型 在上传解析 所需jar包在
+	 * excel_Test文件夹中
+	 * 
+	 * @author Hk
+	 */
+	@SuppressWarnings({ "resource", "unchecked" })
+	@Override
+	public Map<String, String> analyzCertificate(File file) {
+		Map<String, String> subFile = new HashMap<String, String>();
+		InputStream in;
+		ZipEntry ze;
+		ZipFile zi;
+
+		try {
+			zi = new ZipFile(file);
+			in = new BufferedInputStream(new FileInputStream(file));
+			ZipInputStream zin = new ZipInputStream(in);
+			while ((ze = zin.getNextEntry()) != null) {
+				if (!ze.isDirectory()) {
+					byte[] content = new byte[(int) ze.getSize()];
+					// char[] content = new char[(int) ze.getSize()];
+					if (ze.getName().contains("/")) {
+						content = null;
+						continue;
+					}
+					if (ze.getName().substring(ze.getName().indexOf(".") + 1).equals("docx")) {// docx文件特殊处理
+						XWPFDocument xdoc = new XWPFDocument(zi.getInputStream(ze));
+						/*
+						 * XWPFWordExtractor extractor = new XWPFWordExtractor(xdoc); String doc1 = extractor.getText();
+						 * XWPFDocument doc = new XWPFDocument(); XWPFParagraph citiaoP = doc.createParagraph(); XWPFRun
+						 * citiaoR = citiaoP.createRun(); citiaoR.setText(doc1);
+						 */
+						FileOutputStream out = new FileOutputStream(ze.getName());
+						xdoc.write(out);
+						out.close();
+					} else {
+						in = zi.getInputStream(ze);
+						in.read(content);
+						in.close();
+						// String res = new String(content);
+						// System.out.println(res);
+						OutputStream out = new FileOutputStream(ze.getName());
+						out.write(content);
+						out.close();
+					}
+					File certificate = new File(ze.getName());// zip文件里的证书
+					String fileName = ze.getName();
+					String SQH = ze.getName().substring(0, ze.getName().indexOf("."));// 专利授权号
+					List<Patent> temp = patentDao.getPatentListByPTNO2(SQH);
+					if (CollectionUtils.isEmpty(temp)) {
+						subFile.put(SQH, "error");
+						continue;
+					} else {
+						Patent patent = temp.get(0);// 专利授权号 理论上是唯一的
+						Document doc = DocumentHelper.parseText(patent.getXml());
+						Node patentElement = doc.selectSingleNode("/data/patent");
+						if (patentElement.selectNodes("archive_file").size() <= 0) {
+							// 表示这是老记录 没有archive_file这个节点
+							((Element) patentElement).addElement("archive_file");
+							Element archive_file = (Element) doc.selectSingleNode("/data/patent/archive_file");
+							Element fileNode = archive_file.addElement("file");
+							fileNode.addAttribute("seq_no", "1");
+							fileNode.addElement("file_name").addText(SQH);
+
+							// 老文件则说明导入成功 保存这个file
+							ArchiveFile afile = new ArchiveFile();
+							afile.setFile(certificate);
+							if (fileName.length() > 50) {
+								fileName = fileName.substring(0, 50)
+										+ fileName.substring(fileName.indexOf("."), fileName.length());// 文件名太长时截取一部分，保留后缀名
+							}
+							afile.setFileName(fileName);
+							String fileCode = fileService.saveFile(afile,
+									FileConstants.getFileType("patentCertificate"));
+
+							constFileService.recyOneFile(fileCode, true);
+
+							// 测试中
+							System.out.println("文件删除： " + certificate.delete());
+
+							fileNode.addElement("file_code").addText(fileCode);
+							fileNode.addElement("file_remark").addText("专利证书");
+
+							patent.setXml(doc.asXML());
+							patentDao.save(patent);
+
+							subFile.put(SQH, "success");
+						} else {// 新记录则直接插入xml里
+							Element archive_file = (Element) doc.selectSingleNode("/data/patent/archive_file");
+							List<Element> existFiles = archive_file.elements("file");
+							String maxSeq = "1";
+							if (!CollectionUtils.isEmpty(existFiles)) {
+								boolean flag = false;// 标记是否删除重复文件
+								for (Element tempFile : existFiles) {
+									String seq_no = tempFile.attributeValue("seq_no");
+									String oldName = tempFile.elementText("file_name");
+
+									if (oldName.equals(SQH)) {// 用新的覆盖掉旧的
+										archive_file.remove(tempFile);
+										maxSeq = seq_no;
+										flag = true;
+										break;
+									}
+									if (maxSeq.compareTo(seq_no) < 0) {
+										maxSeq = seq_no;
+									}
+								}
+								if (!flag) {// 表示没被删除
+									maxSeq = Integer.parseInt(maxSeq) + 1 + "";
+								}
+							}
+
+							Element fileNode = archive_file.addElement("file");
+							fileNode.addAttribute("seq_no", maxSeq);
+							fileNode.addElement("file_name").addText(SQH);
+
+							ArchiveFile afile = new ArchiveFile();
+							afile.setFile(certificate);
+							if (fileName.length() > 50) {
+								fileName = fileName.substring(0, 50)
+										+ fileName.substring(fileName.indexOf("."), fileName.length());// 文件名太长时截取一部分，保留后缀名
+							}
+							afile.setFileName(fileName);
+							String fileCode = fileService.saveFile(afile,
+									FileConstants.getFileType("patentCertificate"));
+
+							constFileService.recyOneFile(fileCode, true);
+							// 测试中
+							System.out.println("文件删除： " + certificate.delete());
+
+							fileNode.addElement("file_code").addText(fileCode);
+							fileNode.addElement("file_remark").addText("专利证书");
+
+							patent.setXml(doc.asXML());
+							patentDao.save(patent);
+
+							subFile.put(SQH, "success");
+						}
+
+					}
+				} else {
+					subFile.put(ze.getName().substring(0, ze.getName().indexOf("/")), "isDirectory");
+				}
+			}
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (DocumentException e) {
+			e.printStackTrace();
+		} catch (ServiceException e) {
+			e.printStackTrace();
+		}
+		return subFile;
+	}
