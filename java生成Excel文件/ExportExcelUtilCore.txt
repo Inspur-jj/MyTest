@@ -1,0 +1,528 @@
+package com.iris.utils.excel;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang.math.NumberUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+import org.apache.poi.hssf.usermodel.HSSFCell;
+import org.apache.poi.hssf.usermodel.HSSFCellStyle;
+import org.apache.poi.hssf.usermodel.HSSFDataFormat;
+import org.apache.poi.hssf.usermodel.HSSFFont;
+import org.apache.poi.hssf.usermodel.HSSFPrintSetup;
+import org.apache.poi.hssf.usermodel.HSSFRichTextString;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.hssf.util.CellRangeAddress;
+import org.apache.poi.hssf.util.HSSFColor;
+import org.apache.struts2.ServletActionContext;
+
+import com.iris.utils.WebObjectUtil;
+
+@SuppressWarnings("deprecation")
+public class ExportExcelUtil {
+
+	private static Logger log = Logger.getLogger(ExportExcelUtil.class);
+
+	private final static int CELL_TYPE__NUMBERIC_OTH = 7;
+
+	/**
+	 * @param sheetName
+	 *            excel内sheet名称
+	 * @param excelTitle
+	 *            excel列名
+	 * @param exportDocName
+	 *            导出的excel文件名,须带上后缀(.xls)
+	 * @param dataList
+	 *            放入excel的数据集。
+	 * @param columnWidths
+	 *            excel各列宽。
+	 * @param landscape
+	 *            是否设置横向打印
+	 * @param columnAlign
+	 *            列对齐方式
+	 * @param cellTypes
+	 *            单元格类型
+	 */
+	private static void downloadCore(String sheetName, String[] excelTitle, String exportDocName,
+			List<Map<String, Object>> dataList, int[] columnWidths, boolean landscape, int[] columnAlign,
+			int[] cellTypes, String[] headlines, int[] headAlign, String totalInfo, Integer totalColumns) {
+		try {
+			HttpServletResponse response = ServletActionContext.getResponse();
+			String userAgent = ServletActionContext.getRequest().getHeader("User-Agent");
+			// 设置导出excel文件名
+			if (StringUtils.isBlank(exportDocName) || !exportDocName.contains(".")) {
+				exportDocName = "isis-excel.xls";
+			} else if (StringUtils.isNotBlank(exportDocName)) {
+				// 文件名后缀
+				String stuff = exportDocName.substring(exportDocName.lastIndexOf("."), exportDocName.length());
+				if (!stuff.equals(".xls")) {
+					exportDocName = "isis-excel.xls";
+				}
+			}
+			// ---处理文件文件名,防止过长-----------------
+			String extName = "";
+			String preName = exportDocName;
+			if (exportDocName.lastIndexOf(".") != -1) {
+				extName = StringUtils.substring(exportDocName, exportDocName.lastIndexOf("."), exportDocName.length());
+				preName = StringUtils.substring(exportDocName, 0, exportDocName.lastIndexOf("."));
+			}
+			exportDocName = WebObjectUtil.processFileName(preName, userAgent);
+			exportDocName = exportDocName + extName;
+			// 设置导出excel文件流编码
+			response.setHeader("Content-Disposition",
+					"attachment; filename=" + new String(exportDocName.getBytes("gbk"), "iso8859-1"));
+			response.setContentType("application/vnd.ms-excel");
+			HSSFWorkbook workbook = new HSSFWorkbook();
+			HSSFSheet sheet = workbook.createSheet(StringUtils.isNotBlank(sheetName) ? sheetName : "结果集");
+			sheet.setDefaultColumnWidth(16);// 列宽
+
+			// 设置单元格列宽，如果为0则设置自动
+			if (columnWidths != null && columnWidths.length > 0) {
+				for (int i = 0; i < columnWidths.length; i++) {
+					if (columnWidths[i] == 0) {
+						sheet.autoSizeColumn(i);
+					} else {
+						sheet.setColumnWidth(i, columnWidths[i]);
+					}
+				}
+			}
+			// 设置横向事纵向
+			sheet.getPrintSetup().setLandscape(landscape);
+
+			// 设置打印参数
+			HSSFPrintSetup printSetup = sheet.getPrintSetup();
+			printSetup.setPaperSize(HSSFPrintSetup.A4_PAPERSIZE); // 纸张
+			sheet.setDisplayGridlines(false);
+			sheet.setPrintGridlines(false);
+			sheet.setMargin(HSSFSheet.TopMargin, 0.5); // 上边距
+			sheet.setMargin(HSSFSheet.BottomMargin, 0.5); // 下边距
+			sheet.setMargin(HSSFSheet.LeftMargin, 0.5); // 左边距
+			sheet.setMargin(HSSFSheet.RightMargin, 0.5); // 右边距
+			sheet.setHorizontallyCenter(true);
+
+			// 设置表格上面标题（非列名）信息
+			int rowStartIndex = 0; // 行标记
+			int colTitLen = excelTitle.length;
+			if (headlines != null && headlines.length > 0) {
+				rowStartIndex = headlines.length;
+				for (int i = 0; i < rowStartIndex; i++) {
+					HSSFRow headRow = sheet.createRow(i);
+					headRow.setHeight((short) 300);
+					for (int j = 0; j < colTitLen; j++) {
+						HSSFCell cell = headRow.createCell(j);
+						cell.setCellValue(headlines[i]);
+						HSSFCellStyle cellStyle = workbook.createCellStyle();
+						cellStyle.setBorderLeft(HSSFCellStyle.BORDER_THIN);
+						cellStyle.setBorderRight(HSSFCellStyle.BORDER_THIN);
+						cellStyle.setBorderTop(HSSFCellStyle.BORDER_THIN);
+						cellStyle.setBorderBottom(HSSFCellStyle.BORDER_THIN);
+						cellStyle.setAlignment((short) headAlign[i]);
+						HSSFFont font = workbook.createFont();
+						font.setFontHeightInPoints((short) 12);
+						if (i == 0)
+							font.setBoldweight(HSSFFont.BOLDWEIGHT_BOLD);
+						cellStyle.setFont(font);
+						cell.setCellStyle(cellStyle);
+					}
+					sheet.addMergedRegion(new CellRangeAddress(i, i, (short) 0, (short) colTitLen - 1));
+				}
+			}
+
+			// 定义title列cell样式
+			HSSFCellStyle style = workbook.createCellStyle();
+			style.setFillForegroundColor(HSSFColor.SKY_BLUE.index);
+			// style.setFillPattern(HSSFCellStyle.SOLID_FOREGROUND);//背景色
+			style.setBorderBottom(HSSFCellStyle.BORDER_THIN);
+			style.setBorderLeft(HSSFCellStyle.BORDER_THIN);
+			style.setBorderRight(HSSFCellStyle.BORDER_THIN);
+			style.setBorderTop(HSSFCellStyle.BORDER_THIN);
+			style.setAlignment(HSSFCellStyle.ALIGN_LEFT);// 文字居左
+			style.setWrapText(true);// 自动换行
+			// 定义title列cell字体
+			HSSFFont font = workbook.createFont();
+			// font.setColor(HSSFColor.VIOLET.index);//字体颜色
+			font.setFontHeightInPoints((short) 12);
+			font.setBoldweight(HSSFFont.BOLDWEIGHT_BOLD);
+			style.setFont(font);
+
+			// 设置导出excel的title列
+			String[] headers = excelTitle;
+			HSSFRow row = sheet.createRow(rowStartIndex);
+			row.setHeight((short) 300); // 默认标题行高
+			for (int i = 0; i < headers.length; i++) {
+				HSSFCell cell = row.createCell(i);
+				cell.setCellStyle(style);
+				HSSFRichTextString text = new HSSFRichTextString(headers[i]);
+				cell.setCellValue(text);
+			}
+
+			// 定义数据集样式
+			HSSFCellStyle style2 = workbook.createCellStyle();
+			style2.setAlignment(HSSFCellStyle.ALIGN_LEFT);// 文字居左
+			style2.setVerticalAlignment(HSSFCellStyle.VERTICAL_CENTER);
+			// 定义数据集字体样式
+			HSSFFont font2 = workbook.createFont();
+			font2.setBoldweight(HSSFFont.BOLDWEIGHT_NORMAL);
+			style2.setFont(font2);
+			style2.setBorderBottom(HSSFCellStyle.BORDER_THIN);
+			style2.setBorderLeft(HSSFCellStyle.BORDER_THIN);
+			style2.setBorderRight(HSSFCellStyle.BORDER_THIN);
+			style2.setBorderTop(HSSFCellStyle.BORDER_THIN);
+			style2.setWrapText(true);// 自动换行
+
+			HSSFCell cell;
+
+			/*
+			 * 定义每列样式
+			 */
+			List<HSSFCellStyle> styleList = new ArrayList<HSSFCellStyle>();
+			for (int i = 0; i < excelTitle.length; i++) {
+				HSSFCellStyle styleTmp = workbook.createCellStyle();
+				styleTmp.cloneStyleFrom(style2);
+				styleList.add(styleTmp);
+			}
+			// 列对齐方式
+			if (columnAlign != null) {
+				for (int i = 0; i < columnAlign.length && i < styleList.size(); i++) {
+					HSSFCellStyle styleTmp = styleList.get(i);
+					styleTmp.setAlignment((short) columnAlign[i]);
+				}
+			}
+			// 列类型
+			if (cellTypes != null) {
+				for (int i = 0; i < cellTypes.length && i < styleList.size(); i++) {
+					HSSFCellStyle styleTmp = styleList.get(i);
+					styleTmp.setAlignment((short) columnAlign[i]);
+
+					switch (cellTypes[i]) {
+					case HSSFCell.CELL_TYPE_NUMERIC:
+						HSSFDataFormat format = workbook.createDataFormat();
+						styleTmp.setDataFormat(format.getFormat("0.0000"));
+						break;
+					case HSSFCell.CELL_TYPE_STRING:
+						break;
+					case CELL_TYPE__NUMBERIC_OTH:
+						HSSFDataFormat numFmt = workbook.createDataFormat();
+						styleTmp.setDataFormat(numFmt.getFormat("0"));
+						break;
+					default:
+						break;
+					}
+				}
+			}
+
+			// 数据集写入rows
+			for (int i = 0; i < dataList.size(); i++) {
+				Map<String, Object> map = dataList.get(i); // 一行数据
+				row = sheet.createRow(rowStartIndex + 1); // 创建一行
+				// row.setHeight((short) 300); // 行高
+				rowStartIndex++;
+				int columns = 0;
+				for (Map.Entry<String, Object> entry : map.entrySet()) {
+					if (columns < excelTitle.length) {
+						// String key = entry.getKey();
+						String value = ObjectUtils.toString(entry.getValue());
+						cell = row.createCell(columns);
+						if (cellTypes != null && columns < cellTypes.length) {
+							switch (cellTypes[columns]) {
+							case HSSFCell.CELL_TYPE_NUMERIC:
+								if (StringUtils.isNotBlank(value)) {
+									cell.setCellValue(new BigDecimal(value).doubleValue());
+								}
+								cell.setCellType(HSSFCell.CELL_TYPE_NUMERIC);
+								break;
+							case HSSFCell.CELL_TYPE_STRING:
+								cell.setCellValue(StringUtils.isNotBlank(value) ? value : " ");
+								cell.setCellType(HSSFCell.CELL_TYPE_STRING);
+								break;
+							case CELL_TYPE__NUMBERIC_OTH:
+								if (StringUtils.isNotBlank(value)) {
+									cell.setCellValue(new BigDecimal(value).doubleValue());
+								}
+								cell.setCellType(HSSFCell.CELL_TYPE_NUMERIC);
+								break;
+							default:
+								cell.setCellValue(StringUtils.isNotBlank(value) ? value : " ");
+								break;
+							}
+						} else {
+							cell.setCellValue(StringUtils.isNotBlank(value) ? value : " ");
+						}
+						cell.setCellStyle(styleList.get(columns));
+						columns++;
+					}
+				}
+			}
+			if (totalInfo != null) {
+				row = sheet.createRow(rowStartIndex + 1);
+				row.setHeight((short) 300);
+				sheet.addMergedRegion(new CellRangeAddress(rowStartIndex + 1, rowStartIndex + 1, (short) 0,
+						totalColumns - 1));
+				for (int i = 0; i < colTitLen; i++) {
+					cell = row.createCell(i);
+					if (i < totalColumns) {
+						cell.setCellValue(totalInfo);
+					}
+					style.setAlignment((short) 2);
+					style.setBorderLeft(HSSFCellStyle.BORDER_THIN);
+					style.setBorderBottom(HSSFCellStyle.BORDER_THIN);
+					style.setBorderRight(HSSFCellStyle.BORDER_THIN);
+					cell.setCellStyle(style);
+				}
+			}
+
+			workbook.write(response.getOutputStream());
+		} catch (IOException e) {
+			log.error("后台导出excel异常!msg=" + e.getMessage());
+		}
+	}
+
+	/**
+	 * 
+	 * @param sheetName
+	 *            excel内sheet名称
+	 * @param excelTitle
+	 *            excel列名
+	 * @param exportDocName
+	 *            导出的excel文件名,须带上后缀(.xls)
+	 * @param dataList
+	 *            放入excel的数据集。
+	 * @param columnWidths
+	 *            excel各列宽。
+	 * @param landscape
+	 *            是否设置横向打印
+	 */
+	public static void downloadExcel(String sheetName, String[] excelTitle, String exportDocName,
+			List<Map<String, Object>> dataList, int[] columnWidths, boolean landscape) {
+		downloadCore(sheetName, excelTitle, exportDocName, dataList, columnWidths, landscape, null, null, null, null,
+				null, null);
+	}
+
+	/**
+	 * @param sheetName
+	 *            excel内sheet名称
+	 * @param excelTitle
+	 *            excel列名
+	 * @param exportDocName
+	 *            导出的excel文件名,须带上后缀(.xls)
+	 * @param dataList
+	 *            放入excel的数据集。
+	 * @param columnWidths
+	 *            excel各列宽。
+	 * @param landscape
+	 *            是否设置横向打印
+	 * @param columnAlign
+	 *            列对齐方式
+	 * @param cellTypes
+	 *            单元格类型
+	 */
+	public static void downloadExcel(String sheetName, String[] excelTitle, String exportDocName,
+			List<Map<String, Object>> dataList, int[] columnWidths, boolean landscape, int[] columnAlign,
+			int[] cellTypes) {
+		downloadCore(sheetName, excelTitle, exportDocName, dataList, columnWidths, landscape, columnAlign, cellTypes,
+				null, null, null, null);
+	}
+
+	/**
+	 * @param headlines
+	 *            标题（非列名）数组
+	 * @param headAlign
+	 *            headline对齐方式
+	 */
+	public static void downloadExcel(String sheetName, String[] excelTitle, String exportDocName,
+			List<Map<String, Object>> dataList, int[] columnWidths, boolean landscape, int[] columnAlign,
+			int[] cellTypes, String[] headlines, int[] headAlign, String totalInfo, Integer totalColumns) {
+		downloadCore(sheetName, excelTitle, exportDocName, dataList, columnWidths, landscape, columnAlign, cellTypes,
+				headlines, headAlign, totalInfo, totalColumns);
+	}
+
+	/**
+	 * 财务系统专用导出excel,用于第一行带特殊信息excel<br/>
+	 * firstRowInfo 第一行显示信息<br/>
+	 * amtFlag 需要居右的金额列keyname<br/>
+	 * landscape 是否设置横向打印
+	 */
+	public static void pmfsDownloadExcel(String sheetName, String[] excelTitle, String exportDocName,
+			List<String> firstRowInfo, List<String> amtFlag, List<Map<String, Object>> dataList, int[] columnWidths,
+			boolean landscape) {
+		try {
+			HttpServletResponse response = ServletActionContext.getResponse();
+			String userAgent = ServletActionContext.getRequest().getHeader("User-Agent");
+			// 设置导出excel文件名
+			if (StringUtils.isBlank(exportDocName) || !exportDocName.contains(".")) {
+				exportDocName = "isis-excel.xls";
+			} else if (StringUtils.isNotBlank(exportDocName)) {
+				// 文件名后缀
+				String stuff = exportDocName.substring(exportDocName.lastIndexOf("."), exportDocName.length());
+				if (!stuff.equals(".xls")) {
+					exportDocName = "isis-excel.xls";
+				}
+			}
+			// ---处理文件文件名,防止过长-----------------
+			String extName = "";
+			String preName = exportDocName;
+			if (exportDocName.lastIndexOf(".") != -1) {
+				extName = StringUtils.substring(exportDocName, exportDocName.lastIndexOf("."), exportDocName.length());
+				preName = StringUtils.substring(exportDocName, 0, exportDocName.lastIndexOf("."));
+			}
+			exportDocName = WebObjectUtil.processFileName(preName, userAgent);
+			exportDocName = exportDocName + extName;
+			// 设置导出excel文件流编码
+			response.setHeader("Content-Disposition",
+					"attachment; filename=" + new String(exportDocName.getBytes("gbk"), "iso8859-1"));
+			response.setContentType("application/vnd.ms-excel");
+
+			HSSFWorkbook workbook = new HSSFWorkbook();
+			HSSFSheet sheet = workbook.createSheet(StringUtils.isNotBlank(sheetName) ? sheetName : "结果集");
+			sheet.setDefaultColumnWidth(16);// 列宽
+
+			// 设置横向事纵向
+			sheet.getPrintSetup().setLandscape(landscape);
+
+			// 设置打印参数
+			HSSFPrintSetup printSetup = sheet.getPrintSetup();
+			printSetup.setPaperSize(HSSFPrintSetup.A4_PAPERSIZE); // 纸张
+			sheet.setDisplayGridlines(false);
+			sheet.setPrintGridlines(false);
+			sheet.setMargin(HSSFSheet.TopMargin, 0.5); // 上边距
+			sheet.setMargin(HSSFSheet.BottomMargin, 0.5); // 下边距
+			sheet.setMargin(HSSFSheet.LeftMargin, 0.5); // 左边距
+			sheet.setMargin(HSSFSheet.RightMargin, 0.5); // 右边距
+			sheet.setHorizontallyCenter(true);
+
+			// 定义首行信息样式
+			HSSFCellStyle style3 = workbook.createCellStyle();
+			style3.setAlignment(HSSFCellStyle.ALIGN_LEFT);// 文字居左
+			style3.setVerticalAlignment(HSSFCellStyle.VERTICAL_CENTER);
+			HSSFFont font3 = workbook.createFont();
+			font3.setBoldweight(HSSFFont.BOLDWEIGHT_NORMAL);
+			font3.setFontName("Verdana");
+			font3.setFontHeightInPoints((short) 8);
+			style3.setFont(font3);
+			style3.setBorderBottom(HSSFCellStyle.BORDER_THIN);
+			style3.setBorderLeft(HSSFCellStyle.BORDER_THIN);
+			style3.setBorderRight(HSSFCellStyle.BORDER_THIN);
+			style3.setBorderTop(HSSFCellStyle.BORDER_THIN);
+			style3.setWrapText(true);// 自动换行
+
+			HSSFRow row = null;
+			boolean hasFirstRowInfo = firstRowInfo != null && firstRowInfo.size() > 0 ? true : false;
+			if (hasFirstRowInfo) {
+				HSSFCell cell = null;
+				row = sheet.createRow(0);
+				int columns = 0;
+				for (String value : firstRowInfo) {
+					cell = row.createCell(columns++);
+					cell.setCellStyle(style3);
+					cell.setCellValue(new HSSFRichTextString(value).toString());
+				}
+			}
+
+			// 定义title列cell样式
+			HSSFCellStyle style = workbook.createCellStyle();
+			style.setFillForegroundColor(HSSFColor.SKY_BLUE.index);
+			style.setBorderBottom(HSSFCellStyle.BORDER_THIN);
+			style.setBorderLeft(HSSFCellStyle.BORDER_THIN);
+			style.setBorderRight(HSSFCellStyle.BORDER_THIN);
+			style.setBorderTop(HSSFCellStyle.BORDER_THIN);
+			style.setAlignment(HSSFCellStyle.ALIGN_LEFT);// 标题列居左
+			style.setWrapText(true);// 自动换行
+			HSSFFont font = workbook.createFont();// 定义title列cell字体
+			font.setFontHeightInPoints((short) 12);
+			font.setBoldweight(HSSFFont.BOLDWEIGHT_BOLD);
+			style.setFont(font);
+
+			// 设置导出excel的title列
+			String[] headers = excelTitle;
+			row = sheet.createRow(hasFirstRowInfo ? 1 : 0);
+			row.setHeight((short) 300); // 默认标题行高
+
+			for (int i = 0; i < headers.length; i++) {
+				HSSFCell cell = row.createCell(i);
+				cell.setCellStyle(style);
+				HSSFRichTextString text = new HSSFRichTextString(headers[i]);
+				cell.setCellValue(text);
+			}
+
+			// 定义数据集字体样式
+			HSSFFont font2 = workbook.createFont();
+			font2.setBoldweight(HSSFFont.BOLDWEIGHT_NORMAL);
+			font2.setFontName("Verdana");
+			font2.setFontHeightInPoints((short) 8);
+
+			// 定义数据集样式(居左)
+			HSSFCellStyle style_left = workbook.createCellStyle();
+			style_left.setVerticalAlignment(HSSFCellStyle.VERTICAL_CENTER);
+			style_left.setFont(font2);
+			style_left.setAlignment(HSSFCellStyle.ALIGN_LEFT);// 文字居左
+			style_left.setBorderBottom(HSSFCellStyle.BORDER_THIN);
+			style_left.setBorderLeft(HSSFCellStyle.BORDER_THIN);
+			style_left.setBorderRight(HSSFCellStyle.BORDER_THIN);
+			style_left.setBorderTop(HSSFCellStyle.BORDER_THIN);
+			style_left.setWrapText(true);// 自动换行
+			// 定义数据集样式(居右)
+			HSSFCellStyle style_right = workbook.createCellStyle();
+			style_right.setVerticalAlignment(HSSFCellStyle.VERTICAL_CENTER);
+			style_right.setFont(font2);
+			style_right.setAlignment(HSSFCellStyle.ALIGN_RIGHT);// 文字居右
+			style_right.setBorderBottom(HSSFCellStyle.BORDER_THIN);
+			style_right.setBorderLeft(HSSFCellStyle.BORDER_THIN);
+			style_right.setBorderRight(HSSFCellStyle.BORDER_THIN);
+			style_right.setBorderTop(HSSFCellStyle.BORDER_THIN);
+			style_right.setWrapText(true);// 自动换行
+
+			HSSFCell cell = null;
+			// 数据集写入rows
+			for (int i = 0; i < dataList.size(); i++) {
+				Map<String, Object> map = dataList.get(i); // 一行数据
+				row = sheet.createRow(hasFirstRowInfo ? i + 2 : i + 1); // 创建一行
+
+				int columns = 0;
+				for (Map.Entry<String, Object> entry : map.entrySet()) {
+					if (columns < excelTitle.length) {
+						cell = row.createCell(columns++);
+
+						String key = StringUtils.trimToEmpty(entry.getKey());
+						String value = ObjectUtils.toString(entry.getValue());
+						if (amtFlag.contains(key.toLowerCase())) {
+							cell.setCellStyle(style_right);
+							if (NumberUtils.toDouble(value) != 0) {
+								cell.setCellValue(NumberUtils.toDouble(value));
+							} else {
+								cell.setCellValue("");
+							}
+						} else {
+							cell.setCellStyle(style_left);
+							cell.setCellValue(new HSSFRichTextString(StringUtils.isNotBlank(value) ? value : " ")
+									.toString());
+						}
+					}
+				}
+			}
+
+			// 设置单元格列宽，如果为0则设置自动
+			if (columnWidths != null && columnWidths.length > 0) {
+				for (int i = 0; i < columnWidths.length; i++) {
+					if (columnWidths[i] == 0) {
+						sheet.autoSizeColumn(i);
+					} else {
+						sheet.setColumnWidth(i, columnWidths[i]);
+					}
+				}
+			}
+			workbook.write(response.getOutputStream());
+		} catch (IOException e) {
+			log.error("后台导出excel异常,msg=" + e.getMessage());
+		}
+	}
+
+}

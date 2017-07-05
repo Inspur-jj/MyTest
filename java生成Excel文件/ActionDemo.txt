@@ -1,0 +1,39 @@
+@Action("export-fd")
+	public String exportFd() throws Exception {
+		Map<String, Object> params = Struts2Utils.getParameterMap();   //此处这个params主要包含的是headerColums 和 headerTitleColumns 这2个字符数组 主要的作用分别是:headerColumns
+		Iterator<String> it = params.keySet().iterator();			  //用于作为key来取得从数据库中查询出的要导出的map中的数据，headerTitleColumns的作用主要是用作excel文件的列名。
+		while (it.hasNext()) {
+			String key = it.next();
+			String value = ObjectUtils.toString(params.get(key));
+			if ("".equals(value)) {
+				params.put(key, null);
+			}
+		}
+		String headerColumns = ObjectUtils.toString(params.get("headerColumns"));
+		String headerTitleColumns = ObjectUtils.toString(params.get("headerTitleColumns"));
+		if (StringUtils.isNotBlank(headerColumns) && StringUtils.isNotBlank(headerTitleColumns)) {
+			String[] titles = headerTitleColumns.split(",");
+			List<Map<String, Object>> result = null;
+			if (titles.length < 10) { // 经费统计 统计全部 导出 不知道为什么获取不到flag　只能用长度判断
+				result = fdInService.exportFd(params);
+			} else { // 经费统计 按权限统计 导出
+				result = fdInService.exportFd2(params);
+				headerColumns = "A,B,D,E,F,G,H,I,J,K,L,M,N,O,P,S";
+				titles = "序号,项目所属学院,纵横向,项目编号,项目名称,项目负责人,项目来源,项目类别,项目级别,合同经费（万元）,国拨经费（万元）,当年到账,参与人,参与人学院,参与人承担合同经费（万元）,到账年度"
+						.split(",");
+			}
+			List<Map<String, Object>> detailList = new ArrayList<Map<String, Object>>();
+			String[] headers = headerColumns.split(",");
+			for (Map<String, Object> temp : result) {
+				Map<String, Object> detailMap = new LinkedHashMap<String, Object>();
+				for (String header : headers) {
+					if (temp.containsKey(header)) {
+						detailMap.put(header, temp.get(header));
+					}
+				}
+				detailList.add(detailMap);
+			}
+			ExportExcelUtil.downloadExcel("经费详情", titles, System.currentTimeMillis() + ".xls", detailList, null, false);
+		}
+		return null;
+	}

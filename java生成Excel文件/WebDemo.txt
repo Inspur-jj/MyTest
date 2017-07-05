@@ -1,0 +1,108 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+function exportFd2(){
+	var columnList = new Array();
+	var columnTitleList = new Array();
+	$("#checkListPanelt").find("input[name='checkList2']").each(function(){
+		if ($(this).is(":checkbox:checked")) {
+			columnList.push($(this).val());
+			columnTitleList.push($(this).attr("label"));
+		}
+	});
+	if(columnList.length > 0){
+		$("#headerColumns").val(columnList.join(","));
+		$("#headerTitleColumns").val(columnTitleList.join(","));
+		$("#flag2").val(1);
+		$("#exprotForm").submit();
+	}
+}
+<div class="w990 pt20">
+	<!-- 此form 待修改 -->
+	<form id="exprotForm" name="exprotForm" method="post" action="${ctx}/fdstatistics/export-fd"> <!-- 注意这个地方就是跳转 -->
+		<!-- <cpt:search reLoad="true" key="search_fd_statistics" repeatColumn="3" displayCount="5"></cpt:search> -->
+		<security:authorize ifAnyGranted="A_ROLE_ADMIN_CLG,A_ROLE_LEADER_CLG">
+		<cpt:search reLoad="true" key="search_fd_statistics_clg" repeatColumn="3" displayCount="5"></cpt:search>
+		</security:authorize>
+		<!-- 下面是校级角色 -->
+		<security:authorize ifAnyGranted="A_ROLE_ADMIN_KJ,A_ROLE_LEADER_KJ,A_ROLE_ADMIN_SK,A_ROLE_LEADER_SK,A_ROLE_ADMIN_FINANCE">
+		<cpt:search reLoad="true" key="search_fd_statistics_school" repeatColumn="3" displayCount="5"></cpt:search>
+		</security:authorize>
+		<input type="hidden"  name="headerColumns"  id="headerColumns" />
+		<input type="hidden"  name="headerTitleColumns"  id="headerTitleColumns" />
+		<input type="hidden" name="flag2" id="flag2" value="1" />
+	</form>
+
+	<div class="clear_h10"></div>
+  	<div id="bar_btn_dt_dataTable" class="rol_maintitle mt10">
+		<div class="bargain mana_tit">
+			<span>经费统计</span><span class='ft12 f666 ml6 f_noma'>（总数：<label id='total'></label>，金额单位：万元）</span>
+		</div>
+	</div>
+	
+  	<table id="checkListPanelt" width="100%" border="0" cellspacing="0" cellpadding="0" class="t_css_select mt10">
+      <tr>
+        <th align="left" colspan="6">可选列：<input onclick="selectAll2(this)" type="checkbox" name="checkAll2" id="checkAll" label="全选/取消全选" /><span class="ml6">全选/取消全选</span></th>
+      </tr>
+      
+    <tr>
+    	<td colspan="6" align="center">
+        	<table width="96%" border="0" cellspacing="0" cellpadding="0" class="t_css_border">
+        		<tr>
+        				
+						<td width="9%" align="left"><input type="checkbox" data-column="0" value="E" id="E" label="项目编号" name="checkList2" checked="checked"/>
+							<label for="E" style="padding:0px 3px;">项目编号</label>
+						</td>
+						
+						<td width="9%" align="left"><input id="F" data-column="1" type="checkbox" value="F" label="项目名称" name="checkList2" checked="checked"/>
+							<label for="F" style="padding:0px 3px;">项目名称</label>
+						</td>
+
+						<td width="9%" align="left"><input type="checkbox" data-column="2" value="H" id="H" label="项目来源" name="checkList2" checked="checked"/>
+							<label for="H" style="padding:0px 3px;">项目来源</label>
+						</td>
+						
+						<td width="9%" align="left"><input type="checkbox" data-column="3" value="I" id="I" label="项目类别" name="checkList2" checked="checked"/>
+							<label for="I" style="padding:0px 3px;">项目类别</label>
+						</td>
+						
+						<td width="9%" align="left"><input type="checkbox" data-column="4" value="J" id="J" label="项目级别" name="checkList2" checked="checked"/>
+							<label for="J" style="padding:0px 3px;">项目级别</label>
+						</td>
+						
+						<td width="9%" align="left"><input type="checkbox" data-column="5" value="K" id="K" label="合同经费（万元）" name="checkList2" checked="checked"/>
+							<label for="K" style="padding:0px 3px;">合同经费（万元）</label>
+						</td>
+					</tr>
+					<tr>	
+						<td width="9%" align="left"><input type="checkbox" data-column="6" value="L" id="L" label="国拨经费（万元）" name="checkList2" checked="checked"/>
+							<label for="L" style="padding:0px 3px;">国拨经费（万元）</label>
+						</td>
+						
+						<td width="9%" align="left"><input type="checkbox" data-column="7" value="M" id="M" label="当年到账" name="checkList2" checked="checked"/>
+							<label for="M" style="padding:0px 3px;">当年到账</label>
+						</td>
+						
+						<td width="9%" align="left"><input type="checkbox" data-column="8" value="N" id="N" label="参与人" name="checkList2" checked="checked"/>
+							<label for="N" style="padding:0px 3px;">参与人</label>
+						</td>
+
+						<td width="9%" align="left"><input type="checkbox" data-column="9" value="O" id="O" label="参与人学院" name="checkList2" checked="checked"/>
+							<label for="O" style="padding:0px 3px;">参与人学院</label>
+						</td>
+
+						<td width="9%" align="left"><input type="checkbox" data-column="10" value="P" id="P" label="参与人承担合同经费（万元）" name="checkList2" checked="checked"/>
+							<label for="P" style="padding:0px 3px;">参与人承担合同经费（万元）</label>
+						</td>
+
+						<td width="9%" align="left"><input type="checkbox" data-column="11" value="S" id="S" label="到账年度" name="checkList2" checked="checked"/>
+							<label for="S" style="padding:0px 3px;">到账年度</label>
+						</td>
+						
+					</tr>
+			</table>
+        </td>
+    </tr>
+    </table>
+	<div class="clear_h10"></div>
+	<a title="导出" class="green_but fl" href="javascript:exportFd2();">导出</a>
+	<table id="dataTable2" width="100%" border="0" cellspacing="0" cellpadding="1" class="tab mt40"></table>
+</div>
