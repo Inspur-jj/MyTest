@@ -1,0 +1,91 @@
+<resultMap type="map" id="fdStatisticsMap2">
+		<result column="A" property="A"/><!-- prjcode -->
+		<result column="B" property="B"/><!-- 项目所属学院 -->
+		<result column="D" property="D"/><!-- 纵横向  -->
+		<result column="E" property="E"/><!-- 项目编号 -->
+		<result column="F" property="F"/><!-- 项目名称 -->
+		<result column="G" property="G"/><!-- 项目负责人 -->
+		<result column="H" property="H"/><!-- 项目来源 -->
+		<result column="I" property="I"/><!-- 项目类别 -->
+		<result column="J" property="J"/><!-- 项目级别 -->
+		<result column="K" property="K"/><!-- 合同经费 -->
+		<result column="L" property="L"/><!-- 国拨经费 -->
+		<result column="M" property="M"/><!-- 当年到账 -->
+		<result column="N" property="N"/><!-- 参与人姓名 -->
+		<result column="O" property="O"/><!-- 参与人学院 -->
+		<result column="P" property="P"/><!-- 参与人承担合同经费（万元） -->
+		<result column="S" property="S"/><!-- 到账年度 -->
+	</resultMap>
+
+<!-- 经费统计 按权限导出 -->
+	<select id="exportFd2" resultMap="fdStatisticsMap2">
+select
+	rownum as A, 
+	nvl(prj.dept_name,' ') as B,
+	decode(fd.Div_Code,'1','横向','2','纵向',' ') as D,
+	nvl(prj.prj_no,' ') as E,
+	nvl(prj.zh_title,' ') as F,
+	nvl(p.zh_name,' ') as G,
+	<choose>
+		<when test="div_code==1">
+			nvl(cd.zh_cn_caption,' ') as H,
+		</when>
+		<otherwise>
+			nvl(gs.grant_org,' ') as H,
+		</otherwise>
+	</choose>
+	nvl(prj.grant_name,' ') as I,
+    nvl(cd2.zh_cn_caption,' ') as J,
+    nvl(prj.total_amt,'0') as K,
+    nvl(prj.gb_amt,'0') as L,
+    nvl(fd.cur_in_amt,'0') as M,
+    nvl(fdsp.psn_name,' ') as N,
+    nvl(fdsp.dept_name,' ') as O,
+    nvl(fdsp.fund_proportion,'0') as P,
+    substr(to_char(fd.submit_time,'yyyy-mm-dd'),1,4) as S 
+from fd_in fd left join project prj on fd.prj_code=prj.prj_code left join person p on prj.psn_code=p.psn_code 
+left join grant_setting gs on gs.grant_code=prj.grant_code left join const_dictionary cd on prj.project_from = cd.code and cd.category='prj_from' 
+left join project_detail pd on prj.prj_code=pd.prj_code left join const_dictionary cd2 on cd2.code=pd.prj_level1 and cd2.category='const_prj_level' 
+left join fd_in_splite fdsp on fd.in_id=fdsp.in_id  where fd.status='9' 
+		<if test="div_code!=null">
+		and fd.div_code=#{div_code}
+		</if>
+		<if test="adminDepts!=null">
+			and prj.dept_code in 
+			<foreach collection="adminDepts" open="(" close=")" separator="," item="s">
+				#{s}
+			</foreach>
+		</if>
+		<if	test="prjName!=null">
+			and prj.zh_title like '%' || lower(#{prjName}) || '%' 
+		</if>
+		<if test="prjPsnName!=null">
+			and p.zh_name like '%' || lower(#{prjPsnName}) || '%' 
+		</if>
+		<if test="prjDeptName!=null">
+			and prj.dept_name like '%' || lower(#{prjDeptName}) || '%' 
+		</if>
+		<if test="prjDate!=null">
+			and prj.stat_year in 
+			<foreach collection="prjDateList" open="(" close=")" separator="," item="s">
+				#{s}
+			</foreach>
+		</if>
+ 		<if test="sortItem !=null">
+			<choose>
+				<when test="sortItem == 'zhTitle'">
+					order by
+					nlssort(prj.zh_title,'NLS_SORT=SCHINESE_PINYIN_M')
+				</when>
+				<otherwise>
+					order by 'prj.' || ${sortItem}
+				</otherwise>
+			</choose>
+		</if>
+		<if test="sortItem ==null">
+			order by nlssort(prj.zh_title,'NLS_SORT=SCHINESE_PINYIN_M')
+		</if>
+		<if test="sortType !=null">
+			${sortType}
+		</if>
+	</select>
